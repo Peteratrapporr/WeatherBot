@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-
 )
 
 const URL_OPEN_WEATHER_MAP_API = "http://api.openweathermap.org/data/2.5/weather"
-const APP_ID = "58cbb42fff062a563a71946439ea9aea"
-const Rapporr_Token = "MyHclPbYMuAYjyYqTzgh"
+const APP_ID = "58cbb42fff062a563a71946439ea9aea"  //API Key from openweather.org
+const Rapporr_Token = "MyHclPbYMuAYjyYqTzgh" //Token from Rapporr API setup screen for Webhook
 
+//OpenWeather JSON data
 type Forecast struct {
 	Id   float64   `json:"id"`
 	Name string    `json:"name"`
@@ -29,6 +29,7 @@ type MainBlock struct {
 	TempMax  float64 `json:"temp_max"`
 }
 
+//Rapporr Simple Reply JSON format
 type SimpleReply struct {
 	Response_type   string    	`json:"response_type"`
 	Text     	string    	`json:"text"`
@@ -41,6 +42,18 @@ func init() {
 func handler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := appengine.NewContext(r)
+	//From data being sent from Rapporr
+	/*
+		token=ItoB7oEyZIbNmHPfxHQ2GrbC
+		team_id=0001
+		team_domain=example
+		channel_id=xLxysxdhTY23
+		channel_name=test
+		user_id=0001-1001
+		user_name=Steve
+		command=/weather
+		text=Sydney
+	*/
 
 	//get data from call
 	token := r.FormValue("token")
@@ -48,10 +61,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if token != Rapporr_Token {
 		w.WriteHeader(400)
 	}
-
+	//Stop a posssble infinite loop if process inofmration from itself
+	//This could be  the user_id and recormmend for your own system.
+	//Have kept this by Name as being used in different demos
 	if "Weather Bot" == r.FormValue("user_name") {
 		w.WriteHeader(400)
 	}
+
+	//City to search on//Shoud add extra testing to make sure this is just a city name and not some other random text
 	text := r.FormValue("text")
 
 	ctx.Infof("City %v", text)
@@ -59,9 +76,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	weatherData, err := Search(text, ctx)
 	if err != nil {
 		ctx.Infof("Failed to get weather %v",err)
+		w.WriteHeader(400)
 		return
 	}
 
+	//setup reply to Rapporr in simple format
 	reply := SimpleReply{}
 
 	reply.Response_type = "text"
@@ -75,7 +94,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func Search(city string, ctx appengine.Context) (*Forecast, error) {
 	resp, err := GetCurrentWeather(city, ctx)
-
+	//Handle response from search
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +122,7 @@ func Search(city string, ctx appengine.Context) (*Forecast, error) {
 }
 
 func GetCurrentWeather(city string, ctx appengine.Context ) (*http.Response, error) {
-
+	//get weather data from openweather.org
 	url := fmt.Sprintf(URL_OPEN_WEATHER_MAP_API+"?q=%s&appid=%s", city, APP_ID)
 
 	request, err := http.NewRequest("GET", url, nil)
